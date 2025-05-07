@@ -15,11 +15,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Handles graph operations and shortest path queries.
  */
 public class GSPServer extends UnicastRemoteObject implements GSPRemote {
-    private Map<Integer, Set<Integer>> graph;   // Adjacency list representation of the graph
-    private final ReadWriteLock graphLock;      // Lock for concurrent access to the graph
-    private final AtomicInteger nodeCount;      // Counter for total nodes in the graph
-    private final AtomicInteger requestCount;   // Counter for total requests processed
-    private final ConcurrentHashMap<String, Long> processingTimes; // Map to track operation processing times
+    private final Map<Integer, Set<Integer>> graph;                 // Adjacency list representation of the graph
+    private final ReadWriteLock graphLock;                          // Lock for concurrent access to the graph
+    private final AtomicInteger nodeCount;                          // Counter for total nodes in the graph
+    private final AtomicInteger requestCount;                       // Counter for total requests processed
+    private final ConcurrentHashMap<String, Long> processingTimes;  // Map to track operation processing times
 
     private final String serverAddress;
     private final int serverPort;
@@ -179,26 +179,34 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
     /**
      * Process a single operation (query, add, delete).
      *
-     * @param queryResults List to store results of query operations
+     * @param results List to store results of query operations
      * @param operation The operation to process
      */
-    private void processOperation(List<Integer> queryResults, String[] operation) {
-        char op = operation[0].charAt(0);
-        int source = Integer.parseInt(operation[1]);
-        int target = Integer.parseInt(operation[2]);
+    private void processOperation(List<Integer> results, String[] operation) {
+        if (operation.length != 3)
+            return; // Invalid operation format
 
-        switch (op) {
-            case 'Q':
-                queryResults.add(queryShortestPathInternal(source, target));
-                break;
-            case 'A':
-                addEdgeInternal(source, target);
-                break;
-            case 'D':
-                deleteEdgeInternal(source, target);
-                break;
-            default:
-                log("Invalid operation: " + op);
+        // Extract operation type and parameters
+        try {
+            char op = operation[0].charAt(0);
+            int source = Integer.parseInt(operation[1]);
+            int target = Integer.parseInt(operation[2]);
+
+            switch (op) {
+                case 'Q':
+                    results.add(queryShortestPathInternal(source, target));
+                    break;
+                case 'A':
+                    addEdgeInternal(source, target);
+                    break;
+                case 'D':
+                    deleteEdgeInternal(source, target);
+                    break;
+                default:
+                    log("Invalid operation: " + op);
+            }
+        } catch (NumberFormatException e) {
+            log("Invalid operation parameters: " + Arrays.toString(operation));
         }
     }
 
@@ -355,12 +363,8 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         List<Integer> results = new ArrayList<>();
         long batchStartTime = System.currentTimeMillis();
 
-        for (String[] operation : operations) {
-            if (operation.length != 3)
-                continue;
-
+        for (String[] operation : operations)
             processOperation(results, operation);
-        }
 
         long batchEndTime = System.currentTimeMillis();
         log("Processed batch with " + operations.size() + " operations (took " +
