@@ -18,7 +18,7 @@ public class ClientMain {
         try {
             // Load configuration
             Properties config = new Properties();
-            try (InputStream input = new FileInputStream("system.properties")) {
+            try (InputStream input = new FileInputStream("src/system.properties")) {
                 config.load(input);
             }
 
