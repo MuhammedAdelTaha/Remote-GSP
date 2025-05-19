@@ -31,7 +31,6 @@ public class GSPClient {
             log("Connected to server at " + serviceName);
         } catch (Exception e) {
             log("Connection error: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 

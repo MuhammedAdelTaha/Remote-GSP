@@ -18,7 +18,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
     private final Map<Integer, Set<Integer>> graph;                 // Adjacency list representation of the graph
     private final ReadWriteLock graphLock;                          // Lock for concurrent access to the graph
     private final AtomicInteger nodeCount;                          // Counter for total nodes in the graph
-    private final AtomicInteger requestCount;                       // Counter for total requests processed
+    private final ConcurrentHashMap<String, Integer> counts;        // Map to track counts of operations
     private final ConcurrentHashMap<String, Long> processingTimes;  // Map to track operation processing times
 
     private final String serverAddress;
@@ -44,7 +44,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         this.graph = new ConcurrentHashMap<>();
         this.graphLock = new ReentrantReadWriteLock();
         this.nodeCount = new AtomicInteger(0);
-        this.requestCount = new AtomicInteger(0);
+        this.counts = new ConcurrentHashMap<>();
         this.processingTimes = new ConcurrentHashMap<>();
         this.logFilePath = "server_log.txt";
         this.isRunning = false;
@@ -91,10 +91,6 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
             serverSocket = new ServerSocket(serverPort);
             isRunning = true;
             log("Server socket listening on port " + serverPort);
-
-            // Start a thread to handle initial graph input
-            new Thread(this::handleInitialGraph).start();
-
         } catch (Exception e) {
             log("Server start error: " + e.getMessage());
         }
@@ -103,9 +99,9 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
     /**
      * Handle the initial graph input from standard input.
      */
-    private void handleInitialGraph() {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
-            log("Waiting for initial graph input...");
+    public void handleInitialGraph(String filePath) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            log("Reading initial graph from file: " + filePath);
             String line;
 
             while ((line = reader.readLine()) != null) {
@@ -125,54 +121,9 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
                 }
             }
 
-            // Signal ready to receive workload
-            System.out.println("R");
-            System.out.flush();
             log("Initial graph processing complete. Ready for workload.");
-
-            // Now handle batch operations
-            handleBatchOperations(reader);
-
         } catch (IOException e) {
             log("Error handling input: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Handle batch operations from standard input.
-     *
-     * @param reader BufferedReader for standard input
-     * @throws IOException If an I/O error occurs
-     */
-    private void handleBatchOperations(BufferedReader reader) throws IOException {
-        List<String[]> currentBatch = new ArrayList<>();
-        List<Integer> queryResults = new ArrayList<>();
-        String line;
-
-        while ((line = reader.readLine()) != null) {
-            if (!line.trim().equalsIgnoreCase("F")) {
-                // Parse and add operation to current batch
-                String[] parts = line.trim().split("\\s+");
-                if (parts.length == 3)
-                    currentBatch.add(parts);
-                continue;
-            }
-
-            // Process the current batch
-            for (String[] operation : currentBatch)
-                processOperation(queryResults, operation);
-
-            // Output query results
-            for (int result : queryResults)
-                System.out.println(result);
-            System.out.flush();
-
-            // Log the batch processing
-            log("Processed batch with " + currentBatch.size() + " operations");
-
-            // Clear for next batch
-            currentBatch.clear();
-            queryResults.clear();
         }
     }
 
@@ -215,38 +166,37 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
      */
     @Override
     public int queryShortestPath(int sourceNode, int targetNode) throws RemoteException {
-        requestCount.incrementAndGet();
-        long startTime = System.currentTimeMillis();
-        int result = queryShortestPathInternal(sourceNode, targetNode);
-        long endTime = System.currentTimeMillis();
-
-        // Update processing time stats
-        processingTimes.put("query", processingTimes.get("query") + (endTime - startTime));
-
-        log("Query: " + sourceNode + " -> " + targetNode + " = " + result + " (took " + (endTime - startTime) + "ms)");
-        return result;
+        return queryShortestPathInternal(sourceNode, targetNode);
     }
 
     /**
      * Internal implementation of shortest path query using BFS.
      */
     private int queryShortestPathInternal(int sourceNode, int targetNode) {
+        counts.put("query", counts.getOrDefault("query", 0) + 1);
+        long startTime = System.currentTimeMillis();
+        int result = -1;
+
         // If source and target are the same, distance is 0
-        if (sourceNode == targetNode)
-            return 0;
-
-        // Acquire read lock for graph traversal
-        graphLock.readLock().lock();
-        try {
-            // Check if nodes exist in the graph
-            if (!graph.containsKey(sourceNode) || !graph.containsKey(targetNode))
-                return -1;
-
-            // Breadth-First Search for shortest path
-            return bfsShortestPath(sourceNode, targetNode);
-        } finally {
-            graphLock.readLock().unlock();
+        if (sourceNode == targetNode) {
+            result = 0;
+        } else {
+            // Acquire read lock for graph traversal
+            graphLock.readLock().lock();
+            try {
+                // Check if nodes exist in the graph
+                if (graph.containsKey(sourceNode) && graph.containsKey(targetNode))
+                    result = bfsShortestPath(sourceNode, targetNode); // Breadth-First Search for shortest path
+            } finally {
+                graphLock.readLock().unlock();
+            }
         }
+
+        long endTime = System.currentTimeMillis();
+        processingTimes.put("query", processingTimes.getOrDefault("query", 0L) + (endTime - startTime));
+        log("Query: " + sourceNode + " -> " + targetNode + " = " + result + " (took " + (endTime - startTime) + "ms)");
+
+        return result;
     }
 
     /**
@@ -289,21 +239,16 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
      */
     @Override
     public void addEdge(int sourceNode, int targetNode) throws RemoteException {
-        requestCount.incrementAndGet();
-        long startTime = System.currentTimeMillis();
         addEdgeInternal(sourceNode, targetNode);
-        long endTime = System.currentTimeMillis();
-
-        // Update processing time stats
-        processingTimes.put("add", processingTimes.get("add") + (endTime - startTime));
-
-        log("Added edge: " + sourceNode + " -> " + targetNode + " (took " + (endTime - startTime) + "ms)");
     }
 
     /**
      * Internal implementation of adding an edge.
      */
     private void addEdgeInternal(int sourceNode, int targetNode) {
+        counts.put("add", counts.getOrDefault("add", 0) + 1);
+        long startTime = System.currentTimeMillis();
+
         graphLock.writeLock().lock();
         try {
             // Add the source node if it doesn't exist
@@ -323,6 +268,10 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         } finally {
             graphLock.writeLock().unlock();
         }
+
+        long endTime = System.currentTimeMillis();
+        processingTimes.put("add", processingTimes.getOrDefault("add", 0L) + (endTime - startTime));
+        log("Added edge: " + sourceNode + " -> " + targetNode + " (took " + (endTime - startTime) + "ms)");
     }
 
     /**
@@ -330,21 +279,16 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
      */
     @Override
     public void deleteEdge(int sourceNode, int targetNode) throws RemoteException {
-        requestCount.incrementAndGet();
-        long startTime = System.currentTimeMillis();
         deleteEdgeInternal(sourceNode, targetNode);
-        long endTime = System.currentTimeMillis();
-
-        // Update processing time stats
-        processingTimes.put("delete", processingTimes.get("delete") + (endTime - startTime));
-
-        log("Deleted edge: " + sourceNode + " -> " + targetNode + " (took " + (endTime - startTime) + "ms)");
     }
 
     /**
      * Internal implementation of deleting an edge.
      */
     private void deleteEdgeInternal(int sourceNode, int targetNode) {
+        counts.put("delete", counts.getOrDefault("delete", 0) + 1);
+        long startTime = System.currentTimeMillis();
+
         graphLock.writeLock().lock();
         try {
             // If the source node exists, remove the edge to the target
@@ -353,6 +297,10 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         } finally {
             graphLock.writeLock().unlock();
         }
+
+        long endTime = System.currentTimeMillis();
+        processingTimes.put("delete", processingTimes.getOrDefault("delete", 0L) + (endTime - startTime));
+        log("Deleted edge: " + sourceNode + " -> " + targetNode + " (took " + (endTime - startTime) + "ms)");
     }
 
     /**
@@ -367,8 +315,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
             processOperation(results, operation);
 
         long batchEndTime = System.currentTimeMillis();
-        log("Processed batch with " + operations.size() + " operations (took " +
-                (batchEndTime - batchStartTime) + "ms)");
+        log("Processed batch with " + operations.size() + " operations (took " + (batchEndTime - batchStartTime) + "ms)");
 
         return results;
     }
@@ -378,12 +325,15 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
      */
     @Override
     public String getPerformanceMetrics() throws RemoteException {
-        long avgQueryTime = requestCount.get() > 0 ? processingTimes.get("query") / requestCount.get() : 0;
-        long avgAddTime = requestCount.get() > 0 ? processingTimes.get("add") / requestCount.get() : 0;
-        long avgDeleteTime = requestCount.get() > 0 ? processingTimes.get("delete") / requestCount.get() : 0;
+        int queryCount = counts.getOrDefault("query", 0);
+        int addCount = counts.getOrDefault("add", 0);
+        int deleteCount = counts.getOrDefault("delete", 0);
+        long avgQueryTime = queryCount > 0 ? processingTimes.get("query") / queryCount : 0;
+        long avgAddTime = addCount > 0 ? processingTimes.get("add") / addCount : 0;
+        long avgDeleteTime = deleteCount > 0 ? processingTimes.get("delete") / deleteCount : 0;
         return "Performance Metrics:\n" +
                 "Total Nodes: " + nodeCount.get() + "\n" +
-                "Total Requests: " + requestCount.get() + "\n" +
+                "Total Operations: " + (queryCount + addCount + deleteCount) + "\n" +
                 "Average Query Time: " + avgQueryTime + "ms\n" +
                 "Average Add Time: " + avgAddTime + "ms\n" +
                 "Average Delete Time: " + avgDeleteTime + "ms\n";

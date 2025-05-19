@@ -1,56 +1,86 @@
 package Client;
 
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
+/**
+ * ClientMain class for running a GSP Client
+ */
 public class ClientMain {
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.err.println("Usage: GSPClient <clientId>");
+        if (args.length < 3) {
+            System.err.println("Usage: ClientMain <propertiesFile> <batchesFile> <clientID>");
             return;
         }
 
-        try {
-            // Load configuration
-            Properties config = new Properties();
-            try (InputStream input = new FileInputStream("src/system.properties")) {
-                config.load(input);
-            }
+        String propertiesFile = args[0];
+        String batchesFile = args[1];
+        String clientId = args[2];
 
-            String serverAddress = config.getProperty("GSP.server");
-            int rmiRegistryPort = Integer.parseInt(config.getProperty("GSP.rmiregistry.port"));
+        // Load configuration from system.properties
+        Properties prop = new Properties();
+        try (InputStream input = new FileInputStream(propertiesFile)) {
+            prop.load(input);
 
-            // Create client
-            GSPClient client = new GSPClient(args[0]);
+            // Server configuration
+            String serverAddress = prop.getProperty("GSP.server");
+            int rmiRegistryPort = Integer.parseInt(prop.getProperty("GSP.rmiRegistry.port"));
+
+            // Client configuration
+            System.out.println("Starting GSP Client " + clientId);
+            System.out.println("Connecting to server at " + serverAddress + ":" + rmiRegistryPort);
+
+            // Create and connect client
+            GSPClient client = new GSPClient(clientId);
             client.connectToServer(serverAddress, rmiRegistryPort);
 
-            // Read operations from stdin
-            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            System.out.println("Client " + clientId + " connected and ready to process batches.");
+
+            // Read operations from file
+            BufferedReader reader = new BufferedReader(new FileReader(batchesFile));
             String line;
             List<String[]> currentBatch = new ArrayList<>();
-
+            Random random = new Random();
             while ((line = reader.readLine()) != null) {
-                if (line.trim().equalsIgnoreCase("F")) {
+                line = line.trim();
+                if (line.isEmpty())
+                    continue; // Skip empty lines
+
+                if (line.equalsIgnoreCase("F")) {
                     // Process complete batch
+                    System.out.println("Processing batch of " + currentBatch.size() + " operations...");
                     client.sendBatch(currentBatch);
                     currentBatch.clear();
+                    Thread.sleep(random.nextInt(9000) + 1000); // Simulate network delay
+                    System.out.println("Ready for new batch.");
                     continue;
                 }
 
                 String[] parts = line.trim().split("\\s+");
                 if (parts.length == 3) {
                     currentBatch.add(parts);
+                    System.out.println("Added operation to batch: " + line);
+                } else {
+                    System.out.println("Invalid operation format (skipping): " + line);
                 }
             }
 
+            // Process any remaining operations in the last batch (if the batch didn't end with 'F')
+            if (!currentBatch.isEmpty()) {
+                System.out.println("Processing final batch of " + currentBatch.size() + " operations...");
+                client.sendBatch(currentBatch);
+            }
+
+            System.out.println("Finished processing all batches. Client exiting...");
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid port number: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("I/O Error: " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Client error: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Unexpected error: " + e.getMessage());
         }
     }
 }
