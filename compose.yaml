@@ -11,7 +11,7 @@ services:
 
   client1:
     image: remote-gsp
-    command: sh -c "sleep 180; java -cp /home/ubuntu/Remote-GSP/out Client.ClientFrequencyTest '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '1'"
+    command: sh -c "sleep 20; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '1'"
     networks:
       - gsp-net
     volumes:
@@ -19,7 +19,31 @@ services:
 
   # client2:
   #   image: remote-gsp
-  #   command: sh -c "sleep 2; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/client2_batches' '2'"
+  #   command: sh -c "sleep 20; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '2'"
+  #   networks:
+  #     - gsp-net
+  #   volumes:
+  #     - .:/home/ubuntu/Remote-GSP
+
+  # client3:
+  #   image: remote-gsp
+  #   command: sh -c "sleep 20; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '3'"
+  #   networks:
+  #     - gsp-net
+  #   volumes:
+  #     - .:/home/ubuntu/Remote-GSP
+
+  # client4:
+  #   image: remote-gsp
+  #   command: sh -c "sleep 20; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '4'"
+  #   networks:
+  #     - gsp-net
+  #   volumes:
+  #     - .:/home/ubuntu/Remote-GSP
+
+  # client5:
+  #   image: remote-gsp
+  #   command: sh -c "sleep 20; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '5'"
   #   networks:
   #     - gsp-net
   #   volumes:

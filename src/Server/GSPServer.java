@@ -114,7 +114,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
                     try {
                         int source = Integer.parseInt(parts[0]);
                         int target = Integer.parseInt(parts[1]);
-                        addEdgeInternal(source, target);
+                        addEdgeInternal(source, target, false);
                         log("Added initial edge: " + source + " -> " + target);
                     } catch (NumberFormatException e) {
                         log("Invalid edge format: " + line);
@@ -152,7 +152,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
                     results.add(queryShortestPathInternal(source, target));
                     break;
                 case 'A':
-                    addEdgeInternal(source, target);
+                    addEdgeInternal(source, target, true);
                     break;
                 case 'D':
                     deleteEdgeInternal(source, target);
@@ -243,14 +243,15 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
      */
     @Override
     public void addEdge(int sourceNode, int targetNode) throws RemoteException {
-        addEdgeInternal(sourceNode, targetNode);
+        addEdgeInternal(sourceNode, targetNode, true);
     }
 
     /**
      * Internal implementation of adding an edge.
      */
-    private void addEdgeInternal(int sourceNode, int targetNode) {
-        counts.put("add", counts.getOrDefault("add", 0) + 1);
+    private void addEdgeInternal(int sourceNode, int targetNode, boolean addTime) {
+        if (addTime)
+            counts.put("add", counts.getOrDefault("add", 0) + 1);
         long startTime = System.currentTimeMillis();
 
         graphLock.writeLock().lock();
@@ -274,7 +275,8 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         }
 
         long endTime = System.currentTimeMillis();
-        processingTimes.put("add", processingTimes.getOrDefault("add", 0L) + (endTime - startTime));
+        if (addTime)
+            processingTimes.put("add", processingTimes.getOrDefault("add", 0L) + (endTime - startTime));
         log("Added edge: " + sourceNode + " -> " + targetNode + " (took " + (endTime - startTime) + "ms)");
     }
 
@@ -321,7 +323,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         long batchEndTime = System.currentTimeMillis();
         log("Processed batch with " + operations.size() + " operations (took " + (batchEndTime - batchStartTime) + "ms)");
 
-        System.out.println(getPerformanceMetrics());
+        // System.out.println(getPerformanceMetrics());
 
         return results;
     }

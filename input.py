@@ -42,10 +42,10 @@ def write_initial_graph(filename, edges):
 def main():
     # Configuration
     # Total number of nodes in the graph
-    num_nodes = 100 * 1000
+    num_nodes = 1_000
 
     # Initial number of edges
-    num_edges = 5 * 1000 * 1000
+    num_edges = 500_000
 
     # Number of batches
     num_batches = 1000
@@ -54,7 +54,7 @@ def main():
     max_ops_per_batch = 10
 
     # % of operations that are writes (A or D)
-    write_percentage = 30
+    write_percentage = 50
 
     graph_filename = "resources/initial_graph.txt"
     output_filename = "resources/input"

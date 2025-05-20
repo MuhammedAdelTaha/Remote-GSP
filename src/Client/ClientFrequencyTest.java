@@ -40,10 +40,12 @@ public class ClientFrequencyTest {
             String line;
             List<String[]> currentBatch = new ArrayList<>();
 
-            int frequency = 1;
+            int frequency = 5;
             long tsMillis = (long) (1.0f / frequency * 1000.0f);
 
             long millis = 0l;
+            int i = 0;
+            long totalResponseTime = 0;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty())
@@ -51,28 +53,35 @@ public class ClientFrequencyTest {
                 
                 if (line.equalsIgnoreCase("F")) {
                     // Process complete batch
-                    System.out.println("Processing batch of " + currentBatch.size() + " operations...");
+                    if (i % 100 == 0)
+                        System.out.println("Processing batch #" + i + " of " + currentBatch.size() + " operations...");
+
+                    i++;
 
                     millis = System.currentTimeMillis() - millis;
                     if (tsMillis - millis > 0l) {
+                        // System.out.println("Sleeping for " + String.valueOf(tsMillis - millis) + " ms");
                         Thread.sleep(tsMillis - millis);
                     }
-
-                    client.sendBatch(currentBatch);
-
+                    
                     millis = System.currentTimeMillis();
+                    long responseTime = System.currentTimeMillis();
+                    client.sendBatch(currentBatch);
+                    totalResponseTime += System.currentTimeMillis() - responseTime;
+
+                    // millis = System.currentTimeMillis();
 
                     currentBatch.clear();
-                    System.out.println("Ready for new batch.");
+                    // System.out.println("Ready for new batch.");
                     continue;
                 }
 
                 String[] parts = line.trim().split("\\s+");
                 if (parts.length == 3) {
                     currentBatch.add(parts);
-                    System.out.println("Added operation to batch: " + line);
+                    // System.out.println("Added operation to batch: " + line);
                 } else {
-                    System.out.println("Invalid operation format (skipping): " + line);
+                    // System.out.println("Invalid operation format (skipping): " + line);
                 }
             }
 
@@ -81,6 +90,8 @@ public class ClientFrequencyTest {
                 System.out.println("Processing final batch of " + currentBatch.size() + " operations...");
                 client.sendBatch(currentBatch);
             }
+
+            System.out.println("Average response time: " + (float)totalResponseTime / i);
 
             System.out.println("Finished processing all batches. Client exiting...");
         } catch (NumberFormatException e) {

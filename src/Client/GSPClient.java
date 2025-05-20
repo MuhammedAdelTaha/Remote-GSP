@@ -114,9 +114,9 @@ public class GSPClient {
                     " (took " + (endTime - startTime) + "ms)");
 
             // Print query results
-            for (int result : results) {
-                System.out.println(result);
-            }
+            // for (int result : results) {
+            //     System.out.println(result);
+            // }
 
             // Simulate random processing delay
             // Thread.sleep((long)(Math.random() * 10000));
