@@ -1,0 +1,30 @@
+services:
+  server:
+    image: remote-gsp
+    tty: true
+    stdin_open: true
+    command: java -cp /home/ubuntu/Remote-GSP/out Server.ServerMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/initial_graph.txt'
+    networks:
+      - gsp-net
+    volumes:
+      - .:/home/ubuntu/Remote-GSP
+
+  client1:
+    image: remote-gsp
+    command: sh -c "sleep 180; java -cp /home/ubuntu/Remote-GSP/out Client.ClientFrequencyTest '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/input' '1'"
+    networks:
+      - gsp-net
+    volumes:
+      - .:/home/ubuntu/Remote-GSP
+
+  # client2:
+  #   image: remote-gsp
+  #   command: sh -c "sleep 2; java -cp /home/ubuntu/Remote-GSP/out Client.ClientMain '/home/ubuntu/Remote-GSP/resources/system.properties' '/home/ubuntu/Remote-GSP/resources/client2_batches' '2'"
+  #   networks:
+  #     - gsp-net
+  #   volumes:
+  #     - .:/home/ubuntu/Remote-GSP
+
+networks:
+  gsp-net:
+    driver: bridge

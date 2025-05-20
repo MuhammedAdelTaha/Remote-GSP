@@ -4,15 +4,11 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.Random;
 
-/**
- * ClientMain class for running a GSP Client
- */
-public class ClientMain {
+public class ClientFrequencyTest {
     public static void main(String[] args) {
         if (args.length < 3) {
-            System.err.println("Usage: ClientMain <propertiesFile> <batchesFile> <clientID>");
+            System.err.println("Usage: ClientFrequencyTest <propertiesFile> <batchesFile> <clientID>");
             return;
         }
 
@@ -43,18 +39,30 @@ public class ClientMain {
             BufferedReader reader = new BufferedReader(new FileReader(batchesFile));
             String line;
             List<String[]> currentBatch = new ArrayList<>();
-            Random random = new Random();
+
+            int frequency = 1;
+            long tsMillis = (long) (1.0f / frequency * 1000.0f);
+
+            long millis = 0l;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty())
                     continue; // Skip empty lines
-
+                
                 if (line.equalsIgnoreCase("F")) {
                     // Process complete batch
                     System.out.println("Processing batch of " + currentBatch.size() + " operations...");
+
+                    millis = System.currentTimeMillis() - millis;
+                    if (tsMillis - millis > 0l) {
+                        Thread.sleep(tsMillis - millis);
+                    }
+
                     client.sendBatch(currentBatch);
+
+                    millis = System.currentTimeMillis();
+
                     currentBatch.clear();
-                    // Thread.sleep(random.nextInt(9000) + 1000); // Simulate network delay
                     System.out.println("Ready for new batch.");
                     continue;
                 }

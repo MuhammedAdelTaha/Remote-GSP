@@ -100,6 +100,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
      * Handle the initial graph input from standard input.
      */
     public void handleInitialGraph(String filePath) {
+        long millis = System.currentTimeMillis();
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             log("Reading initial graph from file: " + filePath);
             String line;
@@ -120,6 +121,9 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
                     }
                 }
             }
+
+            millis = System.currentTimeMillis() - millis;
+            System.out.println("Initial graph processing complete in " + String.valueOf(millis / 1000.0f) + " seconds");
 
             log("Initial graph processing complete. Ready for workload.");
         } catch (IOException e) {
@@ -317,6 +321,8 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         long batchEndTime = System.currentTimeMillis();
         log("Processed batch with " + operations.size() + " operations (took " + (batchEndTime - batchStartTime) + "ms)");
 
+        System.out.println(getPerformanceMetrics());
+
         return results;
     }
 
@@ -328,15 +334,17 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         int queryCount = counts.getOrDefault("query", 0);
         int addCount = counts.getOrDefault("add", 0);
         int deleteCount = counts.getOrDefault("delete", 0);
-        long avgQueryTime = queryCount > 0 ? processingTimes.get("query") / queryCount : 0;
-        long avgAddTime = addCount > 0 ? processingTimes.get("add") / addCount : 0;
-        long avgDeleteTime = deleteCount > 0 ? processingTimes.get("delete") / deleteCount : 0;
+        float avgQueryTime = queryCount > 0 ? (float)processingTimes.get("query") / queryCount : 0;
+        float avgAddTime = addCount > 0 ? (float)processingTimes.get("add") / addCount : 0;
+        float avgDeleteTime = deleteCount > 0 ? (float)processingTimes.get("delete") / deleteCount : 0;
+        float totalAvgTime = (float)(processingTimes.get("query") + processingTimes.get("add") + processingTimes.get("delete")) / (queryCount + addCount + deleteCount);
         return "Performance Metrics:\n" +
                 "Total Nodes: " + nodeCount.get() + "\n" +
                 "Total Operations: " + (queryCount + addCount + deleteCount) + "\n" +
                 "Average Query Time: " + avgQueryTime + "ms\n" +
                 "Average Add Time: " + avgAddTime + "ms\n" +
-                "Average Delete Time: " + avgDeleteTime + "ms\n";
+                "Average Delete Time: " + avgDeleteTime + "ms\n" + 
+                "Total Average Time: " + totalAvgTime + " ms\n";
     }
 
     /**

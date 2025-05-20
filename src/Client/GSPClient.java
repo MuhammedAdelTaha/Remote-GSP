@@ -29,7 +29,9 @@ public class GSPClient {
             String serviceName = "rmi://" + serverAddress + ":" + rmiRegistryPort + "/GSPService";
             serverStub = (GSPRemote) Naming.lookup(serviceName);
             log("Connected to server at " + serviceName);
+            System.out.println("Connected to server at " + serviceName);
         } catch (Exception e) {
+            System.err.println("Connection error: " + e.getMessage());
             log("Connection error: " + e.getMessage());
         }
     }
@@ -117,7 +119,7 @@ public class GSPClient {
             }
 
             // Simulate random processing delay
-            Thread.sleep((long)(Math.random() * 10000));
+            // Thread.sleep((long)(Math.random() * 10000));
         } catch (Exception e) {
             log("Batch processing failed: " + e.getMessage());
         }
