@@ -20,7 +20,9 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
     private final AtomicInteger nodeCount;                          // Counter for total nodes in the graph
     private final ConcurrentHashMap<String, Integer> counts;        // Map to track counts of operations
     private final ConcurrentHashMap<String, Long> processingTimes;  // Map to track operation processing times
+    private ConcurrentHashMap<Integer, ConcurrentHashMap<Integer, Integer>> cache;  // Map to track operation processing times
 
+    private boolean useCache = false;
     private final String serverAddress;
     private final int serverPort;
     private final int rmiRegistryPort;
@@ -46,6 +48,7 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         this.nodeCount = new AtomicInteger(0);
         this.counts = new ConcurrentHashMap<>();
         this.processingTimes = new ConcurrentHashMap<>();
+        this.cache = new ConcurrentHashMap<>();
         this.logFilePath = "server_log.txt";
         this.isRunning = false;
 
@@ -181,18 +184,29 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         long startTime = System.currentTimeMillis();
         int result = -1;
 
-        // If source and target are the same, distance is 0
-        if (sourceNode == targetNode) {
-            result = 0;
-        } else {
-            // Acquire read lock for graph traversal
-            graphLock.readLock().lock();
-            try {
-                // Check if nodes exist in the graph
-                if (graph.containsKey(sourceNode) && graph.containsKey(targetNode))
-                    result = bfsShortestPath(sourceNode, targetNode); // Breadth-First Search for shortest path
-            } finally {
-                graphLock.readLock().unlock();
+        if(useCache){
+            ConcurrentHashMap<Integer, Integer> sourceNodeCache = cache.get(sourceNode);
+            if (sourceNodeCache != null){
+                result = sourceNodeCache.getOrDefault(targetNode, -1); // -1 indicates not found in cache (targetNode);
+            }
+        }
+
+        if(result == -1){
+            // If source and target are the same, distance is 0
+            if (sourceNode == targetNode) {
+                result = 0;
+            } else {
+                // Acquire read lock for graph traversal
+                graphLock.readLock().lock();
+                try {
+                    // Check if nodes exist in the graph
+                    if (graph.containsKey(sourceNode) && graph.containsKey(targetNode)){
+                        result = bfsShortestPath(sourceNode, targetNode); // Breadth-First Search for shortest path
+                        cache.computeIfAbsent(sourceNode, k -> new ConcurrentHashMap<>()).put(targetNode, result);
+                    }
+                } finally {
+                    graphLock.readLock().unlock();
+                }
             }
         }
 
@@ -254,6 +268,9 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
             counts.put("add", counts.getOrDefault("add", 0) + 1);
         long startTime = System.currentTimeMillis();
 
+        if(useCache){
+            cache = new ConcurrentHashMap<>();
+        }
         graphLock.writeLock().lock();
         try {
             // Add the source node if it doesn't exist
@@ -295,6 +312,9 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
         counts.put("delete", counts.getOrDefault("delete", 0) + 1);
         long startTime = System.currentTimeMillis();
 
+        if(useCache){
+            cache = new ConcurrentHashMap<>();
+        }
         graphLock.writeLock().lock();
         try {
             // If the source node exists, remove the edge to the target
@@ -387,4 +407,8 @@ public class GSPServer extends UnicastRemoteObject implements GSPRemote {
     public boolean isRunning() {
         return isRunning;
     }
+
+    public boolean isUseCache() {return useCache;}
+
+    public void setUseCache(boolean useCache) {this.useCache = useCache;}
 }
